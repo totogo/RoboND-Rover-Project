@@ -35,6 +35,7 @@ ground_truth = mpimg.imread('../calibration_images/map_bw.png')
 # map output looks green in the display image
 ground_truth_3d = np.dstack((ground_truth*0, ground_truth*255, ground_truth*0)).astype(np.float)
 
+
 # Define RoverState() class to retain rover state parameters
 class RoverState():
     def __init__(self):
@@ -52,16 +53,17 @@ class RoverState():
         self.nav_angles = None # Angles of navigable terrain pixels
         self.nav_dists = None # Distances of navigable terrain pixels
         self.ground_truth = ground_truth_3d # Ground truth worldmap
-        self.mode = 'forward' # Current mode (can be forward or stop)
+        self.mode = 'start' # Current mode (can be start, forward or stop)
         self.throttle_set = 0.2 # Throttle setting when accelerating
         self.brake_set = 10 # Brake setting when braking
         # The stop_forward and go_forward fields below represent total count
         # of navigable terrain pixels.  This is a very crude form of knowing
         # when you can keep going and when you should stop.  Feel free to
         # get creative in adding new fields or modifying these!
-        self.stop_forward = 50 # Threshold to initiate stopping
+        self.stop_forward = 100 # Threshold to initiate stopping
         self.go_forward = 500 # Threshold to go forward again
-        self.max_vel = 2 # Maximum velocity (meters/second)
+        self.go_forward_dist = 12
+        self.max_vel = 1.7 # Maximum velocity (meters/second)
         # Image output from perception step
         # Update this image to display your intermediate analysis steps
         # on screen in autonomous mode
@@ -77,7 +79,72 @@ class RoverState():
         self.near_sample = 0 # Will be set to telemetry value data["near_sample"]
         self.picking_up = 0 # Will be set to telemetry value data["picking_up"]
         self.send_pickup = False # Set to True to trigger rock pickup
-# Initialize our rover 
+        # Sample information
+        self.sample_angles = None # Angles of sample pixels
+        self.sample_dists = None # Distances of sample pixels
+        self.found_sample = False
+        self.found_sample_angle = None
+        self.found_sample_dist = None
+        # Obstacle information
+        self.obstacle_angles = None
+        self.obstacle_dists = None
+        # If Rover stucks
+        self.start_stuck_time = None
+        self.stuck = False
+
+    def stop(self):
+        self.throttle = 0
+        self.brake = self.brake_set
+        self.steer = 0
+        self.mode = 'stop'
+
+    def move(self, angle=0, vel=1.):
+        # Release the brake to allow moving or turning
+        self.brake = 0
+        if self.vel < min(vel, self.max_vel):
+            # Set throttle value to throttle setting
+            self.throttle = self.throttle_set
+        else:
+            self.throttle = 0
+        self.steer = angle
+
+    def calc_obstacle_dist(self, angle=None):
+        angle_range = 3
+        if angle is None:
+            angle = 0
+        lower = (angle - angle_range) * np.pi / 180
+        upper = (angle * angle_range) * np.pi / 180
+        # Todo: filter this correctly
+        steer_dists = self.obstacle_dists[(self.obstacle_angles >= lower) &
+                                          (self.obstacle_angles <= upper) &
+                                          (self.obstacle_dists > 5)]
+        # print('steer_dists', steer_dists)
+        if len(steer_dists) <= 0:
+            dist = 99999.9  # Very far away
+        else:
+            dist = np.min(steer_dists)
+
+        print('obstacle distance', dist)
+        # print('min navigable', np.min(self.nav_dists))
+        return dist
+
+    def check_stuck(self):
+        vel_thresh = 0.2
+        time_thresh = 5
+        if self.vel <= vel_thresh and self.mode != 'stop':
+            # it might be stuck in forward mode
+            if not self.start_stuck_time:
+                self.start_stuck_time = time.time()
+            elif time.time() - self.start_stuck_time > time_thresh:
+                self.stuck = True
+                self.found_sample = False
+        elif self.vel > vel_thresh:
+            self.start_stuck_time = None
+            self.stuck = False
+        print('stuck', self.stuck)
+
+
+# Initialize our rover
 Rover = RoverState()
 
 # Variables to track frames per second (FPS)
