@@ -131,7 +131,7 @@ The purpose function `decision_step()` is to make decisions about how the rover 
 * FPS: 14
 
 ##### General approach  
-* The strategy is to always drive the rover through the left side of navigable terrain so that it can map as much as possible the worldmap.
+* The strategy is to always drive the rover through the ~~left side~~ (This strategy has been abandoned because there is high possibility that the rover may stuck in the wall) of navigable terrain so that it can map as much as possible the worldmap.
 * When the rover sees a rock sample, it will slow down the speed and move towards the rock sample. Then it stops when close enough. 
 
 ##### Some techniques

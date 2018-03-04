@@ -4,7 +4,7 @@ import cv2
 
 # Identify pixels above the threshold
 # Threshold of RGB > 160 does a nice job of identifying ground pixels only
-def color_thresh(img, rgb_thresh=(140, 140, 140)):
+def color_thresh(img, rgb_thresh=(150, 150, 150)):
     # Create an array of zeros same xy size as img, but single channel
     navigable = np.zeros_like(img[:, :, 0])
     obstacle = np.zeros_like(img[:, :, 0])
@@ -134,17 +134,29 @@ def perception_step(Rover):
                                               Rover.worldmap.shape[0], 10)
     
     # 7) Update Rover worldmap (to be displayed on right side of screen)
-    Rover.worldmap[obstacle_y_world, obstacle_x_world, 0] += 1
-    Rover.worldmap[rock_y_world, rock_x_world, 1] += 1
-    Rover.worldmap[navigable_y_world, navigable_x_world, 2] += 1
+    if abs(Rover.roll) <= 1 and abs(Rover.pitch) <= 1:
+        Rover.worldmap[obstacle_y_world, obstacle_x_world, 0] += 1
+        Rover.worldmap[rock_y_world, rock_x_world, 1] += 1
+        Rover.worldmap[navigable_y_world, navigable_x_world, 2] += 1
 
     # 8) Convert rover-centric pixel positions to polar coordinates
     # Update Rover pixel distances and angles
     Rover.nav_dists, Rover.nav_angles = to_polar_coords(navigable_xpix, navigable_ypix)
-    Rover.obstacle_dists, Rover.obstacle_angles = to_polar_coords(obstacle_xpix, obstacle_ypix)
+    Rover.nav_angles = Rover.nav_angles * 180 / np.pi
+    if len(Rover.nav_angles) > 1:
+        Rover.max_nav_angle = np.max(Rover.nav_angles)
+        Rover.min_nav_angle = np.min(Rover.nav_angles)
+    else:
+        Rover.max_nav_angle = 0
+        Rover.min_nav_angle = 0
+    print('max nav angle', Rover.max_nav_angle)
+    print('min nav angle', Rover.min_nav_angle)
 
+    Rover.obstacle_dists, Rover.obstacle_angles = to_polar_coords(obstacle_xpix, obstacle_ypix)
+    Rover.obstacle_angles = Rover.obstacle_angles * 180 / np.pi
     # 9) Update sample info
     Rover.sample_dists, Rover.sample_angles = to_polar_coords(rock_xpix, rock_ypix)
+    Rover.sample_angles = Rover.sample_angles * 180 / np.pi
     # print(to_polar_coords(rock_xpix, rock_ypix))
 
     return Rover
